@@ -182,17 +182,19 @@ public class LayoutPersistenceAPI {
     }
 
     public boolean saveWindowLayoutToFile(File file, WindowLayout layout) {
-        file.getParentFile().mkdirs();
-
-        XMLOutputFactory factory = XMLOutputFactory.newInstance();
-        XMLStreamWriter writer;
-        try {
-            writer = factory.createXMLStreamWriter(Files.newOutputStream(file.toPath()));
-        }
-        catch (Exception e) {
+        if(!file.getParentFile().mkdirs())
+            return false;
+        try (final OutputStream out = Files.newOutputStream(file.toPath())){
+            saveWindowLayoutToOutputStream(out, layout);
+            return true;
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public void saveWindowLayoutToOutputStream(final OutputStream out, final  WindowLayout layout) throws XMLStreamException {
+        final XMLStreamWriter writer= outputFactory.createXMLStreamWriter(out);
 
         try {
             writer.writeStartDocument();
@@ -201,20 +203,14 @@ public class LayoutPersistenceAPI {
 
             writer.writeEndDocument();
         }
-        catch (XMLStreamException e) {
-            e.printStackTrace();
-            return false;
-        }
         finally {
             try {
                 writer.close();
-            }
-            catch (XMLStreamException e) {
+            } catch(Exception e)
+            {
                 e.printStackTrace();
             }
         }
-
-        return true;
     }
 
     private void saveLayoutToFile(XMLStreamWriter writer, WindowLayout layout, boolean isMainFrame) throws XMLStreamException {
@@ -377,30 +373,27 @@ public class LayoutPersistenceAPI {
      * @return The loaded WindowLayout
      */
     public WindowLayout loadWindowLayoutFromFile(File file) {
-        XMLInputFactory factory = XMLInputFactory.newInstance();
-        XMLStreamReader reader;
-        try {
-            reader = factory.createXMLStreamReader(Files.newInputStream(file.toPath()));
+        try (final InputStream in = Files.newInputStream(file.toPath())){
+            return loadWindowLayoutFromInputStream(in);
         }
         catch (Exception e) {
             e.printStackTrace();
             return null;
         }
+    }
 
-        WindowLayout layout = null;
+    public WindowLayout loadWindowLayoutFromInputStream(final InputStream in) throws XMLStreamException {
+        final XMLStreamReader reader = inputFactory.createXMLStreamReader(in);
 
         try {
             while (reader.hasNext()) {
                 int next = reader.nextTag();
 
                 if (next == XMLStreamConstants.START_ELEMENT && reader.getLocalName().equals("layout")) {
-                    layout = readLayoutFromReader(reader);
-                    break;
+                    return readLayoutFromReader(reader);
                 }
             }
-        }
-        catch (XMLStreamException e) {
-            e.printStackTrace();
+            return null;
         }
         finally {
             try {
@@ -410,7 +403,6 @@ public class LayoutPersistenceAPI {
                 e.printStackTrace();
             }
         }
-        return layout;
     }
 
     private WindowLayout readLayoutFromReader(XMLStreamReader reader) throws XMLStreamException {
